@@ -1,0 +1,19 @@
+{
+  "DB_HOST": "localhost",
+  "DB_USER": "root",
+  "DB_PASSWORD": "root",
+  "DB_NAME": "criptobot",
+
+  "BINANCE_API_KEY": "a2b33d83a0d237e49d2cfc5e3dbfda01b8353fdb3469992bd913c59b642bbbb8",
+  "BINANCE_API_SECRET": "36eb2ba2bae2e0de71a3cbe153e9d050ad6a4a8af9965dcc2fec51b9a9f95f35",
+
+  "PAIR": "BNB/BTC",
+
+  "LIFE_TIME_ORDER": 3600,
+
+  "ORDER_MIN": 0.30,
+  "ORDER_PRICE_INDEX": 0.7,
+  "ORDER_SUM": 0.01,
+  "QUANTITY_GOOD_ORDERS_MAX": 4,
+  "QUANTITY_GOOD_ORDERS": 0
+}
