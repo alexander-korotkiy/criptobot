@@ -7,14 +7,16 @@ var screen = blessed.screen({
   warnings: true
 });
 
+/**
+ * Шаблон левого верхнего блока информации
+ */
 var boxInfoTopLeft = blessed.box({
   parent: screen,
-  top: '30%',
+  top: '0',
   left: '0',
   width: '33.5%',
   height: '40%',
   tags: true,
-  // label: 'Info',
   border: {
     type: 'line',
     left: false,
@@ -24,7 +26,6 @@ var boxInfoTopLeft = blessed.box({
   },
   style: {
     fg: 'white',
-    // bg: 'black',
     border: {
       fg: '#f0f0f0'
     },
@@ -34,14 +35,16 @@ var boxInfoTopLeft = blessed.box({
   },
 });
 
+/**
+ * Шаблон центрального верхнего блока информации
+ */
 var boxInfoTopCenter = blessed.box({
   parent: screen,
-  top: '30%',
+  top: '0',
   left: '33.5%',
   width: '33.5%',
   height: '40%',
   tags: true,
-  // label: 'Info',
   border: {
     type: 'line',
     left: false,
@@ -51,7 +54,6 @@ var boxInfoTopCenter = blessed.box({
   },
   style: {
     fg: 'white',
-    // bg: 'black',
     border: {
       fg: '#f0f0f0'
     },
@@ -61,14 +63,16 @@ var boxInfoTopCenter = blessed.box({
   },
 });
 
+/**
+ * Шаблон правого верхнего блока информации
+ */
 var boxInfoTopRight = blessed.box({
   parent: screen,
-  top: '30%',
+  top: '0',
   left: '67%',
   width: '33%',
   height: '40%',
   tags: true,
-  // label: 'Info',
   border: {
     type: 'line',
     left: false,
@@ -78,7 +82,6 @@ var boxInfoTopRight = blessed.box({
   },
   style: {
     fg: 'white',
-    // bg: 'black',
     border: {
       fg: '#f0f0f0'
     },
@@ -88,12 +91,15 @@ var boxInfoTopRight = blessed.box({
   },
 });
 
+/**
+ * Шаблон левого блока процесса создания ордеров
+ */
 var logBuyProcess = blessed.log({
   parent: screen,
   bottom: '0',
   left: 'left',
   width: '50%',
-  height: '30%',
+  height: '60%',
   tags: true,
   keys: true,
   vi: true,
@@ -118,7 +124,6 @@ var logBuyProcess = blessed.log({
   },
   style: {
     fg: 'white',
-    // bg: 'black',
     border: {
       fg: '#f0f0f0'
     },
@@ -128,12 +133,15 @@ var logBuyProcess = blessed.log({
   }
 });
 
+/**
+ * Шаблон правого блока процесса продажи ордеров
+ */
 var logSellProcess = blessed.log({
   parent: screen,
   bottom: '0',
   right: '0',
   width: '50%',
-  height: '30%',
+  height: '60%',
   tags: true,
   keys: true,
   vi: true,
@@ -158,7 +166,6 @@ var logSellProcess = blessed.log({
   },
   style: {
     fg: 'white',
-    // bg: 'black',
     border: {
       fg: '#f0f0f0'
     },
@@ -168,29 +175,12 @@ var logSellProcess = blessed.log({
   }
 });
 
-// Append our box to the screen.
-// screen.append(boxInfo);
-// screen.append(logBuyProcess);
-// screen.append(logSellProcess);
-
-// Quit on Escape, q
+// Закрытие скрипта по нажатию Escape, q
 screen.key(['escape', 'q'], function(ch, key) {
   return process.exit(0);
 });
 
-// screen.key(['p'], function(ch, key) {
-//   logBuyProcess.log(`Process is stopped...`);
-//   logSellProcess.log(`Process is stopped...`);
-//   sleep(5000*1000).then(() => {
-//     return process.exit(0);
-//   });
-// });
-
-// Focus our element.
-// boxInfo.focus();
-// logBuyProcess.focus();
-
-// Render the screen.
+// Отображение рабочего экрана
 screen.render();
 
 module.exports = {

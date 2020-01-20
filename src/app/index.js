@@ -6,42 +6,137 @@ const util = require('util');
 const setTimeoutPromise = util.promisify(setTimeout);
 const { blessed, screen, boxInfoTopLeft, boxInfoTopCenter, boxInfoTopRight, logBuyProcess, logSellProcess } = require('screens');
 
+/**
+ * Директория хранения логов продажи
+ */
 const dirLogs = config.get('DIR_LOGS');
 
+/**
+ * Иформация о торговой паре
+ */
 const pairParts = config.get('PAIR').split('/');
 const pair = pairParts.join('');
 
+/**
+ * Коеффициент увеличение стоимости валюты для ордера продажи
+ */
 const altPriceBuyIndex = config.get('ALT_PRICE_BUY_INDEX');
+
+/**
+ * Коеффициент уменьшения стоимости валюты для ордера покупки
+ */
 const ratio = config.get('RATIO');
+
+/**
+ * Максимальное количество одновременно работающих ордеров на покупку
+ */
 const quantityGoodOrdersMax = config.get('QUANTITY_GOOD_ORDERS_MAX');
-const orderSum = config.get("ORDER_SUM");
+
+/**
+ * Текущее количество рабочих одреров на покупку
+ */
 let quantityGoodOrders = config.get('QUANTITY_GOOD_ORDERS');
+
+/**
+ * Сумма сделки в BTC
+ */
+const orderSum = config.get("ORDER_SUM");
+
+/**
+ * Время жизни ордера на покупку в с.
+ */
 const lifeTimeOrder = config.get('LIFE_TIME_ORDER');
+
+/**
+ * Пауза от момента срабатывания ордера покупки до момента создания ордера продажи
+ */
 const pauseTime = config.get('PAUSE_TIME');
 
+/**
+ * Ограничение точности цены для заданной валюты (кол-во знаков после запятой)
+ */
 let priceFilterSize = 8;
 
+/**
+ * Минимальная сумма ордера продажи
+ */
 let orderMin = config.get('ORDER_MIN');
+
+/**
+ * Уменьшенная сумма ордера покупки
+ */
 let orderPrice = ratio * orderMin;
 
+/**
+ * Текущий баланс BTC
+ */
 let BalBTC;
+
+/**
+ * Доступный баланс BTC
+ */
 let BalBTCAv;
+
+/**
+ * Баланс BTC задействованный в ордерах
+ */
 let BalBTCInOrder;
 
+/**
+ * Текущий баланс ALT
+ */
 let BalALTAv;
+
+/**
+ * Доступный баланс ALT
+ */
 let BalALTInOrder;
+
+/**
+ * Баланс ALT задействованный в ордерах
+ */
 let BalALT;
 
+/**
+ * Последняя цена BTC ($)
+ */
 let LastPriceBTC;
+
+/**
+ * Последняя цена ALT (BTC)
+ */
 let LastPriceALT;
 
+/**
+ * Средняя цена сработавших ордеров на покупку
+ */
 let averagePriceBuy = 0;
+
+/**
+ * Момент времени последней успешной сделки покупки
+ */
 let timeLastOrderBuy = 0;
 
+/**
+ * Идентификатор последнего ордера на продажу
+ */
 let sellOpenOrderId = false;
+
+/**
+ * Метка разрешения создания ордера на продажу
+ */
 let sellOrderFlag = false;
+
+/**
+ * Количество рабочих ордеров на продажу
+ */
 let quantityGoodOrderSell = 0;
 
+
+/**
+ * Метод вывода текущей информации по ценам и переменным бота
+ * @returns {Promise<void>}
+ */
 const printInfo = async () => {
   const time = 1000;
 
@@ -79,6 +174,11 @@ const printInfo = async () => {
   await printInfo();
 };
 
+
+/**
+ * Метод обновления информации о балансе аккаунта
+ * @returns {Promise<void>}
+ */
 const setBalance = async () => {
   let balances = await pricing.getBalances();
 
@@ -95,6 +195,11 @@ const setBalance = async () => {
   LastPriceALT = parseFloat(prices[pair]);
 };
 
+
+/**
+ * Метод проверки необходимых условий перед созданием ордера покупки
+ * @returns {Promise<void>}
+ */
 const buyProcess = async () => {
   const time = 1000;
   let error = false;
@@ -113,6 +218,11 @@ const buyProcess = async () => {
   }
 };
 
+
+/**
+ * Метод создания ордера покупки
+ * @returns {Promise<void>}
+ */
 const createOrder = async (price, lastBalance) => {
   let quantity = Math.ceil(orderSum / price);
   logBuyProcess.log(`---------------------------------`);
@@ -131,6 +241,11 @@ const createOrder = async (price, lastBalance) => {
   }
 };
 
+
+/**
+ * Метод завершения жизни ордера и проверки его статуса
+ * @returns {Promise<void>}
+ */
 const closeOrder = async (orderId, lastPrice, lastBalance) => {
   const time = lifeTimeOrder * 1000;
   await setTimeoutPromise(time);
@@ -168,6 +283,11 @@ const closeOrder = async (orderId, lastPrice, lastBalance) => {
   }
 };
 
+
+/**
+ * Метод создания ордера продажи
+ * @returns {Promise<void>}
+ */
 const sellProcess = async () => {
   const time = 1000;
   let error = false;
@@ -241,6 +361,11 @@ const sellProcess = async () => {
   sellProcess();
 };
 
+
+/**
+ * Метод заполнения данных для работы бота на основе последних ордеров
+ * @returns {Promise<void>}
+ */
 const getCurrentOrdersInfo = async () => {
   let orders = await pricing.getAllOrders(pair);
   let totalPrice = 0;
@@ -264,6 +389,11 @@ const getCurrentOrdersInfo = async () => {
   averagePriceBuy = totalPrice / quantityGoodOrders;
 };
 
+
+/**
+ * Запись лога срабатывания ордеров продажи
+ * @returns {Promise<void>}
+ */
 const writeLogFile = async (orderId) => {
   let lastOrderStatus = await pricing.checkOrderStatus(pair, orderId);
 
@@ -286,28 +416,31 @@ const writeLogFile = async (orderId) => {
 module.exports = {
   start: async () => {
 
-    // Cancel open orders if exists
+    // Отменяем все существующие ордера торговой пары
     let openOrders = await pricing.openOrders(pair);
-    // await openOrders.filter((order) => order.side === 'BUY').forEach((order) => {
-    //   pricing.cancel(pair, order.orderId);
-    // });
     await openOrders.forEach((order) => {
       pricing.cancel(pair, order.orderId);
     });
 
+    // Отменяем рабочую информацию
     await getCurrentOrdersInfo();
 
+    // Получаем информацию по балансу
     await setBalance();
+
+    // Получаем основную информацию в окна
     printInfo();
 
+    // Получаем информацию о точности валюты ALT
     priceFilterSize = LastPriceALT.toString().includes('.') ? LastPriceALT.toString().split('.').pop().length : 0;
 
+    // Запускаем процесс покупки
     logBuyProcess.log('Start of buy process...');
     buyProcess();
 
+    // Запускаем процесс продажи
     logSellProcess.log('Start of sell process...');
     sellProcess();
 
-    // screen.render();
   }
 };
