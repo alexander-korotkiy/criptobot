@@ -30,7 +30,6 @@ module.exports = {
   openOrders: async (pair) => new Promise((resolve, reject) => {
     binance.openOrders(pair, (err, openOrders, symbol) => {
       err ? reject(err.body) : resolve(openOrders)
-      // console.log("openOrders("+symbol+")", openOrders);
     })
   }),
   buy: async (pair, quantity, price) => new Promise((resolve, reject) => {
@@ -38,12 +37,27 @@ module.exports = {
       err ? reject(err.body) : resolve(response.orderId)
     })
   }),
+  sell: async (pair, quantity, price) => new Promise((resolve, reject) => {
+    binance.sell(pair, quantity, price, {type: 'LIMIT'}, (err, response) => {
+      err ? reject(err.body) : resolve(response.orderId)
+    })
+  }),
   cancel: async (pair, orderId) => new Promise((resolve, reject) => {
     binance.cancel(pair, orderId, (err, response, symbol) => {
       err ? reject(err.body) : resolve(response)
     })
-  })
-}
+  }),
+  getAllOrders: async (pair) => new Promise((resolve, reject) => {
+    binance.allOrders(pair, (err, response, symbol) => {
+      err ? reject(err.body) : resolve(response)
+    })
+  }),
+  checkOrderStatus: async (pair, orderId) => new Promise((resolve, reject) => {
+    binance.orderStatus(pair, orderId, (err, response, symbol) => {
+      err ? reject(err.body) : resolve(response)
+    })
+  }),
+};
 
 
 
