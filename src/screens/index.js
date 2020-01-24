@@ -175,6 +175,34 @@ var logSellProcess = blessed.log({
   }
 });
 
+
+
+
+var logErrors = blessed.log({
+  parent: screen,
+  top: '0',
+  right: '0',
+  width: '0',
+  height: '0',
+  tags: true,
+  border: {
+    type: 'line',
+    left: false,
+    top: false,
+    right: false,
+    bottom: false
+  },
+  style: {
+    fg: 'white',
+    border: {
+      fg: '#f0f0f0'
+    },
+    hover: {
+      bg: 'green'
+    }
+  },
+});
+
 // Закрытие скрипта по нажатию Escape, q
 screen.key(['escape', 'q'], function(ch, key) {
   return process.exit(0);
@@ -191,5 +219,6 @@ module.exports = {
   boxInfoTopRight: boxInfoTopRight,
   boxInfoTopLeft: boxInfoTopLeft,
   logSellProcess: logSellProcess,
-  logBuyProcess: logBuyProcess
+  logBuyProcess: logBuyProcess,
+  logErrors: logErrors,
 };

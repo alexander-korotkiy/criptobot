@@ -5,6 +5,12 @@ const APISECRET = config.get('BINANCE_API_SECRET')
 
 const binance = require('node-binance-api')().options({ APIKEY, APISECRET, useServerTime: true })
 
+const { logErrors } = require('screens');
+
+process.on('unhandledRejection', error => {
+  logErrors.log('unhandledRejection', error);
+});
+
 module.exports = {
 
   /**
@@ -15,6 +21,8 @@ module.exports = {
     binance.balance((err, obj) => {
       err ? reject(err.body) : resolve(obj)
     })
+  }).catch(error => {
+    logErrors.log(error);
   }),
 
   /**
@@ -25,6 +33,8 @@ module.exports = {
     binance.prices((err, obj) => {
       err ? reject(err.body) : resolve(obj)
     })
+  }).catch(error => {
+    logErrors.log(error);
   }),
 
   /**
@@ -36,6 +46,8 @@ module.exports = {
     binance.openOrders(pair, (err, openOrders, symbol) => {
       err ? reject(err.body) : resolve(openOrders)
     })
+  }).catch(error => {
+    logErrors.log(error);
   }),
 
   /**
@@ -49,6 +61,8 @@ module.exports = {
     binance.buy(pair, quantity, price, {type: 'LIMIT'}, (err, response) => {
       err ? reject(err.body) : resolve(response.orderId)
     })
+  }).catch(error => {
+    logErrors.log(error);
   }),
 
   /**
@@ -62,6 +76,8 @@ module.exports = {
     binance.sell(pair, quantity, price, {type: 'LIMIT'}, (err, response) => {
       err ? reject(err.body) : resolve(response.orderId)
     })
+  }).catch(error => {
+    logErrors.log(error);
   }),
 
   /**
@@ -74,6 +90,8 @@ module.exports = {
     binance.cancel(pair, orderId, (err, response, symbol) => {
       err ? reject(err.body) : resolve(response)
     })
+  }).catch(error => {
+    logErrors.log(error);
   }),
 
   /**
@@ -85,6 +103,8 @@ module.exports = {
     binance.allOrders(pair, (err, response, symbol) => {
       err ? reject(err.body) : resolve(response)
     })
+  }).catch(error => {
+    logErrors.log(error);
   }),
 
   /**
@@ -97,6 +117,8 @@ module.exports = {
     binance.orderStatus(pair, orderId, (err, response, symbol) => {
       err ? reject(err.body) : resolve(response)
     })
+  }).catch(error => {
+    logErrors.log(error);
   }),
 };
 

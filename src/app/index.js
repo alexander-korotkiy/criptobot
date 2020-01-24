@@ -4,7 +4,9 @@ const path = require('path');
 const fs = require('fs');
 const util = require('util');
 const setTimeoutPromise = util.promisify(setTimeout);
-const { blessed, screen, boxInfoTopLeft, boxInfoTopCenter, boxInfoTopRight, logBuyProcess, logSellProcess } = require('screens');
+const { blessed, screen, boxInfoTopLeft, boxInfoTopCenter, boxInfoTopRight, logBuyProcess, logSellProcess,
+  logErrors
+} = require('screens');
 
 /**
  * Директория хранения логов продажи
@@ -35,12 +37,12 @@ const quantityGoodOrdersMax = config.get('QUANTITY_GOOD_ORDERS_MAX');
 /**
  * Текущее количество рабочих одреров на покупку
  */
-let quantityGoodOrders = config.get('QUANTITY_GOOD_ORDERS');
+quantityGoodOrders = config.get('QUANTITY_GOOD_ORDERS');
 
 /**
  * Сумма сделки в BTC
  */
-const orderSum = config.get("ORDER_SUM");
+orderSum = config.get("ORDER_SUM");
 
 /**
  * Время жизни ордера на покупку в с.
@@ -55,82 +57,82 @@ const pauseTime = config.get('PAUSE_TIME');
 /**
  * Ограничение точности цены для заданной валюты (кол-во знаков после запятой)
  */
-let priceFilterSize = 8;
+priceFilterSize = 8;
 
 /**
  * Минимальная сумма ордера продажи
  */
-let orderMin = config.get('ORDER_MIN');
+orderMin = config.get('ORDER_MIN');
 
 /**
  * Уменьшенная сумма ордера покупки
  */
-let orderPrice = ratio * orderMin;
+orderPrice = ratio * orderMin;
 
 /**
  * Текущий баланс BTC
  */
-let BalBTC;
+BalBTC = 0;
 
 /**
  * Доступный баланс BTC
  */
-let BalBTCAv;
+BalBTCAv = 0;
 
 /**
  * Баланс BTC задействованный в ордерах
  */
-let BalBTCInOrder;
+BalBTCInOrder = 0;
 
 /**
  * Текущий баланс ALT
  */
-let BalALTAv;
+BalALTAv = 0;
 
 /**
  * Доступный баланс ALT
  */
-let BalALTInOrder;
+BalALTInOrder = 0;
 
 /**
  * Баланс ALT задействованный в ордерах
  */
-let BalALT;
+BalALT = 0;
 
 /**
  * Последняя цена BTC ($)
  */
-let LastPriceBTC;
+LastPriceBTC = 0;
 
 /**
  * Последняя цена ALT (BTC)
  */
-let LastPriceALT;
+LastPriceALT = 0;
 
 /**
  * Средняя цена сработавших ордеров на покупку
  */
-let averagePriceBuy = 0;
+averagePriceBuy = 0;
 
 /**
  * Момент времени последней успешной сделки покупки
  */
-let timeLastOrderBuy = 0;
+timeLastOrderBuy = 0;
 
 /**
  * Идентификатор последнего ордера на продажу
  */
-let sellOpenOrderId = false;
+sellOpenOrderId = false;
 
 /**
  * Метка разрешения создания ордера на продажу
  */
-let sellOrderFlag = false;
+sellOrderFlag = false;
 
 /**
  * Количество рабочих ордеров на продажу
  */
-let quantityGoodOrderSell = 0;
+quantityGoodOrderSell = 0;
 
 
 /**
@@ -139,10 +141,6 @@ let quantityGoodOrderSell = 0;
  */
 const printInfo = async () => {
   const time = 1000;
-
-  const prices = await pricing.getPrices();
-  LastPriceBTC = parseFloat(prices.BTCUSDT);
-  LastPriceALT = parseFloat(prices[pair]);
 
   await setBalance();
 
@@ -171,7 +169,7 @@ const printInfo = async () => {
   screen.render();
 
   await setTimeoutPromise(time);
-  await printInfo();
+  printInfo();
 };
 
 
@@ -181,16 +179,18 @@ const printInfo = async () => {
  */
 const setBalance = async () => {
   let balances = await pricing.getBalances();
-
-  BalBTCAv = parseFloat(balances.BTC.available);
-  BalBTCInOrder = parseFloat(balances.BTC.onOrder);
-  BalBTC = BalBTCAv + BalBTCInOrder;
-
-  BalALTAv = parseFloat(balances[pairParts[0]].available);
-  BalALTInOrder = parseFloat(balances[pairParts[0]].onOrder);
-  BalALT = BalALTAv + BalALTInOrder;
-
   const prices = await pricing.getPrices();
+
+  if (typeof balances.BTC !== 'undefined') {
+    BalBTCAv = parseFloat(balances.BTC.available);
+    BalBTCInOrder = parseFloat(balances.BTC.onOrder);
+    BalBTC = BalBTCAv + BalBTCInOrder;
+
+    BalALTAv = parseFloat(balances[pairParts[0]].available);
+    BalALTInOrder = parseFloat(balances[pairParts[0]].onOrder);
+    BalALT = BalALTAv + BalALTInOrder;
+  }
+
   LastPriceBTC = parseFloat(prices.BTCUSDT);
   LastPriceALT = parseFloat(prices[pair]);
 };
@@ -201,7 +201,7 @@ const setBalance = async () => {
  * @returns {Promise<void>}
  */
 const buyProcess = async () => {
-  const time = 1000;
+  const time = 5*1000;
   let error = false;
 
   orderPrice = parseFloat((ratio * orderMin).toFixed(priceFilterSize));
@@ -224,7 +224,8 @@ const buyProcess = async () => {
  * @returns {Promise<void>}
  */
 const createOrder = async (price, lastBalance) => {
-  let quantity = Math.ceil(orderSum / price);
+  // let quantity = Math.ceil(orderSum / price);
+  let quantity = (orderSum / price).toFixed(2);
   logBuyProcess.log(`---------------------------------`);
   logBuyProcess.log(`Create order - quantity = ${quantity}, price = ${price.toFixed(priceFilterSize)}`);
 
@@ -248,6 +249,9 @@ const createOrder = async (price, lastBalance) => {
  */
 const closeOrder = async (orderId, lastPrice, lastBalance) => {
   const time = lifeTimeOrder * 1000;
+
+  sellOrderFlag = true;
+
   await setTimeoutPromise(time);
 
   logBuyProcess.log(`Expired order with id - ${orderId}`);
@@ -255,30 +259,40 @@ const closeOrder = async (orderId, lastPrice, lastBalance) => {
   let orderStatus = await pricing.checkOrderStatus(pair, orderId);
 
   await setBalance();
+  await setTimeoutPromise(2000);
+
   if (BalALT > lastBalance) {
     orderMin = lastPrice;
-    quantityGoodOrders = quantityGoodOrders + 1;
     timeLastOrderBuy = orderStatus.time;
 
     let orders = await pricing.getAllOrders(pair);
     let totalPrice = 0;
+    quantityGoodOrders = 0;
     await orders.reverse().some((o) => {
-      if (o.side === 'SELL' && o.status === 'FILLED') {
+      if (o.side === 'SELL' && (o.status === 'FILLED' || o.executedQty > 0)) {
         return true;
       }
-      if (o.side === 'BUY' && (o.status === 'FILLED' || o.status === 'PARTIALLY_FILLED')) {
+      if (o.side === 'BUY' && (o.status === 'FILLED' || o.executedQty > 0)) {
         totalPrice += parseFloat(o.price);
+        quantityGoodOrders++;
       }
     });
 
     averagePriceBuy = totalPrice / quantityGoodOrders;
-    sellOrderFlag = true;
+    // sellOrderFlag = true;
     logBuyProcess.log(`Order closed, balance increased...\n`);
     buyProcess();
   } else {
     logBuyProcess.log(`Balance has not changed...`);
     logBuyProcess.log(`Cancel order with id - ${orderId}\n`);
-    pricing.cancel(pair, orderId);
+    try {
+      await pricing.cancel(pair, orderId);
+    } catch (e) {
+      let error = JSON.parse(e);
+      logBuyProcess.log(`Error call binance API`);
+      logBuyProcess.log(`Code: ${error.code}`);
+      logBuyProcess.log(`Message: ${error.msg}`);
+    }
     buyProcess();
   }
 };
@@ -289,10 +303,10 @@ const closeOrder = async (orderId, lastPrice, lastBalance) => {
  * @returns {Promise<void>}
  */
 const sellProcess = async () => {
-  const time = 1000;
+  const time = 5*1000;
   let error = false;
 
-  if (Math.floor(BalALTAv) <= 0) {
+  if (BalALTAv.toFixed(2) <= 0) {
     error = true;
   }
 
@@ -314,7 +328,7 @@ const sellProcess = async () => {
     logSellProcess.log(`Order closed, alt sold...`);
     await writeLogFile(sellOpenOrderId);
 
-    for (let i = 0; i <= quantityGoodOrderSell; i++) {
+    for (let i = 0; i < quantityGoodOrderSell; i++) {
       orderMin = orderMin / ratio;
     }
 
@@ -334,14 +348,15 @@ const sellProcess = async () => {
     logSellProcess.log(`---------------------------------`);
 
     let altPriceBuy = altPriceBuyIndex * averagePriceBuy;
+    let altBalInOrder = BalALTAv.toFixed(2);
     try {
-      sellOpenOrderId = await pricing.sell(pair, Math.floor(BalALTAv), altPriceBuy.toFixed(priceFilterSize));
+      sellOpenOrderId = await pricing.sell(pair, altBalInOrder, altPriceBuy.toFixed(priceFilterSize));
       quantityGoodOrderSell = quantityGoodOrders;
       sellOrderFlag = false;
       logSellProcess.log(`Sell order created...`);
       logSellProcess.log(`orderId: ${sellOpenOrderId}`);
       logSellProcess.log(`price: ${altPriceBuy.toFixed(priceFilterSize)}`);
-      logSellProcess.log(`quantity: ${Math.floor(BalALTAv)}`);
+      logSellProcess.log(`quantity: ${altBalInOrder}`);
     } catch (e) {
       let error = JSON.parse(e);
       if (error.msg === 'Filter failure: MIN_NOTIONAL') {
@@ -352,8 +367,8 @@ const sellProcess = async () => {
         logSellProcess.log(`Error call binance API`);
         logSellProcess.log(`Code: ${error.code}`);
         logSellProcess.log(`Message: ${error.msg}`);
+        return false;
       }
-      return false;
     }
   }
 
@@ -371,11 +386,11 @@ const getCurrentOrdersInfo = async () => {
   let totalPrice = 0;
 
   await orders.reverse().some((o) => {
-    if (o.side === 'SELL' && o.status === 'FILLED') {
+    if (o.side === 'SELL' && (o.status === 'FILLED' || o.executedQty > 0)) {
       return true;
     }
 
-    if (o.side === 'BUY' && (o.status === 'FILLED' || o.status === 'PARTIALLY_FILLED')) {
+    if (o.side === 'BUY' && (o.status === 'FILLED' || o.executedQty > 0)) {
       totalPrice += parseFloat(o.price);
       quantityGoodOrders++;
       if (o.time > timeLastOrderBuy) {
@@ -408,10 +423,14 @@ const writeLogFile = async (orderId) => {
   try {
     fs.writeFileSync(path.resolve(dirLogs, pair + '_log.txt'), content, {flag: 'a'});
   } catch (err) {
-    logSellProcess.error(err);
+    logSellProcess.log(err);
   }
   logSellProcess.log(`Success write log file...\n`);
 };
+
+// const test = async () => {
+//   logErrors.log(await pricing.cancel(pair, '57005850'));
+// };
 
 module.exports = {
   start: async () => {
@@ -426,10 +445,12 @@ module.exports = {
     await getCurrentOrdersInfo();
 
     // Получаем информацию по балансу
-    await setBalance();
+    // await setBalance();
 
     // Получаем основную информацию в окна
-    printInfo();
+    await printInfo();
+
+    // await test();
 
     // Получаем информацию о точности валюты ALT
     priceFilterSize = LastPriceALT.toString().includes('.') ? LastPriceALT.toString().split('.').pop().length : 0;
