@@ -1,0 +1,28 @@
+{
+  "DIR_LOGS_BUY": "logsBuy",
+  "DIR_LOGS_SELL": "logsSell",
+
+  "DB_HOST": "localhost",
+  "DB_USER": "root",
+  "DB_PASSWORD": "root",
+  "DB_NAME": "criptobot",
+
+  "BINANCE_API_KEY": "****",
+  "BINANCE_API_SECRET": "****",
+
+  "PAIR": "GVT/BTC",
+
+  "LIFE_TIME_ORDER": 100,
+  "PAUSE_TIME": 30,
+
+  "ORDER_MIN": 0.0002,
+  "RATIO": 0.997,
+  "RATIO_BUY": 1.001,
+  "RATIO_SELL": 0.001,
+  "ORDER_SUM": 0.0002,
+  "QUANTITY_GOOD_ORDERS_MAX": 4,
+  "QUANTITY_GOOD_ORDERS": 0,
+
+  "ALT_PRICE_BUY_INDEX": 1.003
+
+}

@@ -5,13 +5,23 @@ const APISECRET = config.get('BINANCE_API_SECRET')
 
 const binance = require('node-binance-api')().options({ APIKEY, APISECRET, useServerTime: true })
 
-const { logErrors } = require('screens');
+const { logBuyProcess } = require('screens');
 
 process.on('unhandledRejection', error => {
-  logErrors.log('unhandledRejection', error);
+  logBuyProcess.log('unhandledRejection', error);
 });
 
+let logError = (error) => {
+  // logBuyProcess.log(`***********************`);
+  // logBuyProcess.log(`Error call binance API`);
+  // logBuyProcess.log(error);
+  // logBuyProcess.log(`***********************`);
+  logBuyProcess.log(``);
+};
+
 module.exports = {
+
+  logError: logError,
 
   /**
    * Получения информации о текущих балансах аккаунта
@@ -22,7 +32,7 @@ module.exports = {
       err ? reject(err.body) : resolve(obj)
     })
   }).catch(error => {
-    logErrors.log(error);
+    logError(error);
   }),
 
   /**
@@ -34,7 +44,7 @@ module.exports = {
       err ? reject(err.body) : resolve(obj)
     })
   }).catch(error => {
-    logErrors.log(error);
+    logError(error);
   }),
 
   /**
@@ -47,7 +57,7 @@ module.exports = {
       err ? reject(err.body) : resolve(openOrders)
     })
   }).catch(error => {
-    logErrors.log(error);
+    logError(error);
   }),
 
   /**
@@ -58,11 +68,9 @@ module.exports = {
    * @returns {Promise<object>}
    */
   buy: async (pair, quantity, price) => new Promise((resolve, reject) => {
-    binance.buy(pair, quantity, price, {type: 'LIMIT'}, (err, response) => {
+    binance.buy(pair, quantity, price, { type: 'LIMIT' }, (err, response) => {
       err ? reject(err.body) : resolve(response.orderId)
     })
-  }).catch(error => {
-    logErrors.log(error);
   }),
 
   /**
@@ -73,11 +81,9 @@ module.exports = {
    * @returns {Promise<object>}
    */
   sell: async (pair, quantity, price) => new Promise((resolve, reject) => {
-    binance.sell(pair, quantity, price, {type: 'LIMIT'}, (err, response) => {
+    binance.sell(pair, quantity, price, { type: 'LIMIT' }, (err, response) => {
       err ? reject(err.body) : resolve(response.orderId)
     })
-  }).catch(error => {
-    logErrors.log(error);
   }),
 
   /**
@@ -90,8 +96,6 @@ module.exports = {
     binance.cancel(pair, orderId, (err, response, symbol) => {
       err ? reject(err.body) : resolve(response)
     })
-  }).catch(error => {
-    logErrors.log(error);
   }),
 
   /**
@@ -104,7 +108,7 @@ module.exports = {
       err ? reject(err.body) : resolve(response)
     })
   }).catch(error => {
-    logErrors.log(error);
+    logError(error);
   }),
 
   /**
@@ -118,7 +122,43 @@ module.exports = {
       err ? reject(err.body) : resolve(response)
     })
   }).catch(error => {
-    logErrors.log(error);
+    logError(error);
+  }),
+
+  /**
+   * Получение полной информации по ограничениям торговых пар
+   * @returns {Promise<object>}
+   */
+  exchangeInfo: async () => new Promise((resolve, reject) => {
+    binance.exchangeInfo((err, response) => {
+      if (err) {
+        reject(err.body);
+      } else {
+        let minimums = {};
+        for (let obj of response.symbols) {
+          let filters = { status: obj.status };
+          for (let filter of obj.filters) {
+            if (filter.filterType == "MIN_NOTIONAL") {
+              filters.minNotional = filter.minNotional;
+            } else if (filter.filterType == "PRICE_FILTER") {
+              filters.minPrice = filter.minPrice;
+              filters.maxPrice = filter.maxPrice;
+              filters.tickSize = filter.tickSize;
+            } else if (filter.filterType == "LOT_SIZE") {
+              filters.stepSize = filter.stepSize;
+              filters.minQty = filter.minQty;
+              filters.maxQty = filter.maxQty;
+            }
+          }
+          filters.orderTypes = obj.orderTypes;
+          filters.icebergAllowed = obj.icebergAllowed;
+          minimums[obj.symbol] = filters;
+        }
+        resolve(minimums);
+      }
+    })
+  }).catch(error => {
+    logError(error);
   }),
 };
 

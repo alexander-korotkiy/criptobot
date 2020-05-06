@@ -8,10 +8,15 @@ const { blessed, screen, boxInfoTopLeft, boxInfoTopCenter, boxInfoTopRight, logB
   logErrors
 } = require('screens');
 
+Number.prototype.toFixedNoRounding = function(n) {
+  return Math.floor(this * n) / n;
+};
+
 /**
  * Директория хранения логов продажи
  */
-const dirLogs = config.get('DIR_LOGS');
+const dirLogsBuy = config.get('DIR_LOGS_BUY');
+const dirLogsSell = config.get('DIR_LOGS_SELL');
 
 /**
  * Иформация о торговой паре
@@ -28,6 +33,16 @@ const altPriceBuyIndex = config.get('ALT_PRICE_BUY_INDEX');
  * Коеффициент уменьшения стоимости валюты для ордера покупки
  */
 const ratio = config.get('RATIO');
+
+/**
+ * Коеффициент покупки
+ */
+const ratioBuy = config.get('RATIO_BUY');
+
+/**
+ * Коеффициент продажи
+ */
+const ratioSell = config.get('RATIO_SELL');
 
 /**
  * Максимальное количество одновременно работающих ордеров на покупку
@@ -58,6 +73,11 @@ const pauseTime = config.get('PAUSE_TIME');
  * Ограничение точности цены для заданной валюты (кол-во знаков после запятой)
  */
 priceFilterSize = 8;
+
+/**
+ * Ограничение точности кол-ва для заданной валюты (кол-во знаков после запятой)
+ */
+quantityFilterSize = 0;
 
 /**
  * Минимальная сумма ордера продажи
@@ -134,6 +154,11 @@ sellOrderFlag = false;
  */
 quantityGoodOrderSell = 0;
 
+/**
+ * Текущий часовой пояс
+ */
+tzoffset = (new Date()).getTimezoneOffset() * 120000;
+
 
 /**
  * Метод вывода текущей информации по ценам и переменным бота
@@ -155,16 +180,15 @@ const printInfo = async () => {
   boxInfoTopCenter.content = `LastPriceBTC = ${LastPriceBTC}\n` +
     `LastPriceALT = ${LastPriceALT}\n`;
 
-  let tzoffset = (new Date()).getTimezoneOffset() * 120000;
   let orderTimeFormat = timeLastOrderBuy ?
     new Date(timeLastOrderBuy - tzoffset).toISOString().replace(/T/, ' ').replace(/\..+/, '')
     : 0;
-  boxInfoTopRight.content = `orderMin = ${orderMin.toFixed(priceFilterSize)}\n` +
-    `orderPrice = ${orderPrice.toFixed(priceFilterSize)}\n` +
+  boxInfoTopRight.content = `orderMin = ${orderMin.toFixedNoRounding(priceFilterSize)}\n` +
+    `orderPrice = ${orderPrice.toFixedNoRounding(priceFilterSize)}\n` +
     `quantityGoodOrders = ${quantityGoodOrders}\n` +
     `timeLastOrderBy = ${orderTimeFormat}\n` +
-    `averagePriceBuy = ${averagePriceBuy.toFixed(priceFilterSize)}\n` +
-    `altPriceBuy = ${(averagePriceBuy * altPriceBuyIndex).toFixed(priceFilterSize)}`;
+    `averagePriceBuy = ${averagePriceBuy.toFixedNoRounding(priceFilterSize)}\n` +
+    `altPriceBuy = ${(averagePriceBuy * altPriceBuyIndex).toFixedNoRounding(priceFilterSize)}`;
 
   screen.render();
 
@@ -181,7 +205,7 @@ const setBalance = async () => {
   let balances = await pricing.getBalances();
   const prices = await pricing.getPrices();
 
-  if (typeof balances.BTC !== 'undefined') {
+  if (typeof balances !== 'undefined') {
     BalBTCAv = parseFloat(balances.BTC.available);
     BalBTCInOrder = parseFloat(balances.BTC.onOrder);
     BalBTC = BalBTCAv + BalBTCInOrder;
@@ -191,8 +215,10 @@ const setBalance = async () => {
     BalALT = BalALTAv + BalALTInOrder;
   }
 
-  LastPriceBTC = parseFloat(prices.BTCUSDT);
-  LastPriceALT = parseFloat(prices[pair]);
+  if (typeof prices !== 'undefined') {
+    LastPriceBTC = parseFloat(prices.BTCUSDT);
+    LastPriceALT = parseFloat(prices[pair]);
+  }
 };
 
 
@@ -204,17 +230,19 @@ const buyProcess = async () => {
   const time = 5*1000;
   let error = false;
 
-  orderPrice = parseFloat((ratio * orderMin).toFixed(priceFilterSize));
+  // orderPrice = parseFloat((ratio * orderMin).toFixedNoRounding(priceFilterSize));
 
-  if (LastPriceALT > orderPrice || quantityGoodOrders >= quantityGoodOrdersMax || BalBTCAv < orderSum) {
+  if (LastPriceALT > orderMin || quantityGoodOrders >= quantityGoodOrdersMax || BalBTCAv < orderSum) {
     error = true;
   }
+
+  orderPrice = parseFloat((LastPriceALT * ratioBuy).toFixedNoRounding(priceFilterSize));
 
   if (error) {
     await setTimeoutPromise(time);
     buyProcess();
   } else {
-    createOrder(LastPriceALT, BalALT);
+    createOrder(orderPrice, BalALT);
   }
 };
 
@@ -225,19 +253,17 @@ const buyProcess = async () => {
  */
 const createOrder = async (price, lastBalance) => {
   // let quantity = Math.ceil(orderSum / price);
-  let quantity = (orderSum / price).toFixed(2);
+  let quantity = (orderSum / price).toFixedNoRounding(quantityFilterSize);
+  let createTime = new Date(new Date().getTime() - tzoffset).toISOString().replace(/T/, ' ').replace(/\..+/, '');
   logBuyProcess.log(`---------------------------------`);
-  logBuyProcess.log(`Create order - quantity = ${quantity}, price = ${price.toFixed(priceFilterSize)}`);
+  logBuyProcess.log(`Create order - quantity = ${quantity}, price = ${price.toFixedNoRounding(priceFilterSize)}`);
 
   try {
     let orderId = await pricing.buy(pair, quantity, price);
-    logBuyProcess.log(`Buy order created - orderId: ${orderId}`);
+    logBuyProcess.log(`${createTime} - Buy order created - orderId: ${orderId}`);
     await closeOrder(orderId, price, lastBalance);
   } catch (e) {
-    let error = JSON.parse(e);
-    logBuyProcess.log(`Error call binance API`);
-    logBuyProcess.log(`Code: ${error.code}`);
-    logBuyProcess.log(`Message: ${error.msg}`);
+    pricing.logError(e);
     return false;
   }
 };
@@ -262,7 +288,7 @@ const closeOrder = async (orderId, lastPrice, lastBalance) => {
   await setTimeoutPromise(2000);
 
   if (BalALT > lastBalance) {
-    orderMin = lastPrice;
+    orderMin = parseFloat((ratio*orderMin).toFixedNoRounding(priceFilterSize));
     timeLastOrderBuy = orderStatus.time;
 
     let orders = await pricing.getAllOrders(pair);
@@ -280,18 +306,18 @@ const closeOrder = async (orderId, lastPrice, lastBalance) => {
 
     averagePriceBuy = totalPrice / quantityGoodOrders;
     // sellOrderFlag = true;
-    logBuyProcess.log(`Order closed, balance increased...\n`);
+    let orderClosedTime = new Date(orderStatus.updateTime - tzoffset).toISOString().replace(/T/, ' ').replace(/\..+/, '')
+    logBuyProcess.log(`${orderClosedTime} - Order closed, balance increased...`);
+    await writeLogFile(orderId, dirLogsBuy);
     buyProcess();
   } else {
+    let cancelTime = new Date(new Date().getTime() - tzoffset).toISOString().replace(/T/, ' ').replace(/\..+/, '');
     logBuyProcess.log(`Balance has not changed...`);
-    logBuyProcess.log(`Cancel order with id - ${orderId}\n`);
+    logBuyProcess.log(`${cancelTime} - Cancel order with id - ${orderId}\n`);
     try {
       await pricing.cancel(pair, orderId);
     } catch (e) {
-      let error = JSON.parse(e);
-      logBuyProcess.log(`Error call binance API`);
-      logBuyProcess.log(`Code: ${error.code}`);
-      logBuyProcess.log(`Message: ${error.msg}`);
+      pricing.logError(e);
     }
     buyProcess();
   }
@@ -306,7 +332,7 @@ const sellProcess = async () => {
   const time = 5*1000;
   let error = false;
 
-  if (BalALTAv.toFixed(2) <= 0) {
+  if (BalALTAv.toFixedNoRounding(quantityFilterSize) <= 0) {
     error = true;
   }
 
@@ -320,17 +346,21 @@ const sellProcess = async () => {
 
   let openOrders = await pricing.openOrders(pair);
   let orderFilled = true;
-  await openOrders.filter((order) => order.side === 'SELL').forEach((o) => {
-    orderFilled = false;
-  });
+  if (typeof openOrders !== 'undefined') {
+    await openOrders.filter((order) => order.side === 'SELL').forEach((o) => {
+      orderFilled = false;
+    });
+  }
 
   if (orderFilled && sellOpenOrderId) {
     logSellProcess.log(`Order closed, alt sold...`);
-    await writeLogFile(sellOpenOrderId);
+    await writeLogFile(sellOpenOrderId, dirLogsSell);
 
-    for (let i = 0; i < quantityGoodOrderSell; i++) {
-      orderMin = orderMin / ratio;
-    }
+    // for (let i = 0; i < quantityGoodOrderSell; i++) {
+    //   orderMin = orderMin / ratio;
+    // }
+
+    orderMin = parseFloat((orderMin / (ratio - ratioSell)).toFixedNoRounding(priceFilterSize));
 
     quantityGoodOrders = 0;
     quantityGoodOrderSell = 0;
@@ -340,22 +370,27 @@ const sellProcess = async () => {
   if (!error) {
     await openOrders.filter((order) => order.side === 'SELL').forEach((order) => {
       pricing.cancel(pair, order.orderId);
-      logSellProcess.log(`Cancel sell order with id - ${order.orderId}\n`);
+      let cancelTime = new Date(new Date().getTime() - tzoffset).toISOString().replace(/T/, ' ').replace(/\..+/, '');
+      logSellProcess.log(`${cancelTime} - Cancel sell order with id - ${order.orderId}\n`);
     });
 
     await setBalance();
     await setTimeoutPromise(2000);
     logSellProcess.log(`---------------------------------`);
 
+    if (!averagePriceBuy) {
+      averagePriceBuy = parseFloat((LastPriceALT * ratioBuy).toFixedNoRounding(priceFilterSize));
+    }
     let altPriceBuy = altPriceBuyIndex * averagePriceBuy;
-    let altBalInOrder = BalALTAv.toFixed(2);
+    let altBalInOrder = BalALTAv.toFixedNoRounding(quantityFilterSize);
     try {
-      sellOpenOrderId = await pricing.sell(pair, altBalInOrder, altPriceBuy.toFixed(priceFilterSize));
+      sellOpenOrderId = await pricing.sell(pair, altBalInOrder, altPriceBuy.toFixedNoRounding(priceFilterSize));
       quantityGoodOrderSell = quantityGoodOrders;
       sellOrderFlag = false;
-      logSellProcess.log(`Sell order created...`);
+      let createTime = new Date(new Date().getTime() - tzoffset).toISOString().replace(/T/, ' ').replace(/\..+/, '');
+      logSellProcess.log(`${createTime} - Sell order created...`);
       logSellProcess.log(`orderId: ${sellOpenOrderId}`);
-      logSellProcess.log(`price: ${altPriceBuy.toFixed(priceFilterSize)}`);
+      logSellProcess.log(`price: ${altPriceBuy.toFixedNoRounding(priceFilterSize)}`);
       logSellProcess.log(`quantity: ${altBalInOrder}`);
     } catch (e) {
       let error = JSON.parse(e);
@@ -364,9 +399,7 @@ const sellProcess = async () => {
         logSellProcess.log(`Waiting for another purchase...`);
         sellOrderFlag = false;
       } else {
-        logSellProcess.log(`Error call binance API`);
-        logSellProcess.log(`Code: ${error.code}`);
-        logSellProcess.log(`Message: ${error.msg}`);
+        pricing.logError(e);
         return false;
       }
     }
@@ -406,10 +439,10 @@ const getCurrentOrdersInfo = async () => {
 
 
 /**
- * Запись лога срабатывания ордеров продажи
+ * Запись лога срабатывания ордеров продажи и покупки
  * @returns {Promise<void>}
  */
-const writeLogFile = async (orderId) => {
+const writeLogFile = async (orderId, dirLogs) => {
   let lastOrderStatus = await pricing.checkOrderStatus(pair, orderId);
 
   let tzoffset = (new Date()).getTimezoneOffset() * 120000;
@@ -425,7 +458,11 @@ const writeLogFile = async (orderId) => {
   } catch (err) {
     logSellProcess.log(err);
   }
-  logSellProcess.log(`Success write log file...\n`);
+  if (dirLogs === 'logsBuy') {
+    logBuyProcess.log(`Success write log file...\n`);
+  } else {
+    logSellProcess.log(`Success write log file...\n`);
+  }
 };
 
 // const test = async () => {
@@ -452,13 +489,27 @@ module.exports = {
 
     // await test();
 
-    // Получаем информацию о точности валюты ALT
+    // Получаем информацию о точности кол-ва валюты ALT
+    let pairInfo = await pricing.exchangeInfo();
+    quantityFilterSize = parseFloat(pairInfo[pair].minQty).toString().includes('.') ? parseFloat(pairInfo[pair].minQty).toString().split('.').pop().length : 0;
+    let numberQuantityFilterSize = '1';
+    for (let i = 0; i < quantityFilterSize; i++) {
+      numberQuantityFilterSize += '0';
+    }
+    quantityFilterSize = parseInt(numberQuantityFilterSize);
+
+    // Получаем информацию о точности цены валюты ALT
     priceFilterSize = LastPriceALT.toString().includes('.') ? LastPriceALT.toString().split('.').pop().length : 0;
+    let numberPriceFilterSize = '1';
+    for (let i = 0; i < priceFilterSize; i++) {
+      numberPriceFilterSize += '0';
+    }
+    priceFilterSize = parseInt(numberPriceFilterSize);
 
     // Запускаем процесс покупки
     logBuyProcess.log('Start of buy process...');
     buyProcess();
-
+    //
     // Запускаем процесс продажи
     logSellProcess.log('Start of sell process...');
     sellProcess();

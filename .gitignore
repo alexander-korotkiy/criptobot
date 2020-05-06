@@ -1,5 +1,6 @@
 # Logs
-logs
+logsBuy
+logsSell
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -104,3 +105,5 @@ dist
 .tern-port
 
 .idea
+
+configs/*.json
